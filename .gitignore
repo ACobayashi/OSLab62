@@ -1,0 +1,28 @@
+.DS_Store
+
+# Local backup of the originally received partial folder
+/imports/
+
+# uCore build output
+/lab1/codes/**/bin/
+/lab1/codes/**/obj/
+/imports/**/bin/
+/imports/**/obj/
+**/.qemu.out
+**/.gdb.in
+**/*.tar.gz
+
+# Local toolchain links/binaries
+/tools/riscv/bin/*
+!/tools/riscv/bin/.gitkeep
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
