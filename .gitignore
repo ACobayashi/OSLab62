@@ -19,6 +19,8 @@
 .vscode/
 .idea/
 *.swp
+**/.projectile
+**/.score
 
 # Secrets
 .env
