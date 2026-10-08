@@ -403,23 +403,23 @@ stepi
 
 GDB 调试截图使用 QEMU 4.1.1、OpenSBI v0.4 和 `gdb-multiarch` 17.2；实验环境表中的版本为其他构建与运行记录，此处按截图列出 GDB 验证环境。
 
-<img src="./images/gdb-reset-vector.png" alt="GDB 连接复位入口并查看前五条指令" width="549">
+<img src="./images/myx/gdb-reset-vector.png" alt="GDB 连接复位入口并查看前五条指令" width="549">
 
 图4：GDB 连接后 `$pc=0x1000`，查看 QEMU 复位向量的前五条指令。
 
-<img src="./images/gdb-opensbi-entry.png" alt="单步复位代码到达 OpenSBI" width="549">
+<img src="./images/myx/gdb-opensbi-entry.png" alt="单步复位代码到达 OpenSBI" width="549">
 
 图5：执行 `stepi 5` 后，`$pc=0x80000000`，到达 OpenSBI 固件入口。
 
-<img src="./images/gdb-kernel-entry.png" alt="在内核入口设置断点并查看入口指令" width="549">
+<img src="./images/myx/gdb-kernel-entry.png" alt="在内核入口设置断点并查看入口指令" width="549">
 
 图6：在 `0x80200000` 断下，确认 `kern_entry` 的入口指令。
 
-<img src="./images/gdb-stack-pointer.png" alt="单步内核入口并检查栈指针" width="549">
+<img src="./images/myx/gdb-stack-pointer.png" alt="单步内核入口并检查栈指针" width="549">
 
 图7：单步后 `$pc=0x80200004`、`$sp=0x80203000`，验证栈指针初始化。
 
-<img src="./images/qemu-kernel-boot.png" alt="QEMU 启动 OpenSBI 并输出内核启动消息" width="549">
+<img src="./images/myx/qemu-kernel-boot.png" alt="QEMU 启动 OpenSBI 并输出内核启动消息" width="549">
 
 图8：QEMU 显示 OpenSBI 启动信息及内核输出 `(THU.CST) os is loading ...`。
 
