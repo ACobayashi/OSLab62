@@ -72,9 +72,9 @@ flowchart LR
 
 ### 2.2 功能的逐步实现
 
-按照手册顺序，先了解项目组成及 OpenSBI、ELF/bin，再分析链接布局和 SBI 输出封装，最后检查 Makefile 的构建过程并运行 `make qemu`。
+按照手册顺序，先了解项目组成及 OpenSBI、ELF/bin，再分析链接布局和 SBI 输出封装；接着检查 Makefile 的构建过程，通过 `make qemu` 验证内核能够输出启动消息。最后用 QEMU 和 GDB 验证启动链：在 `0x1000` 查看复位指令，确认其跳转目标为 `0x80000000`，在 `0x80200000` 的 `kern_entry` 处设置断点，并单步观察栈指针设置和跳转到 `kern_init` 的过程。
 
-现有代码已经包含上述功能，构建与输出部分主要进行构建、运行和分析，实际代码改动为 Makefile 中 `qemu` 目标的一项加载参数。
+现有代码已经包含上述功能，构建与输出部分主要进行构建、运行和分析，实际代码改动为 Makefile 中 `qemu` 目标的一项加载参数。GDB 调试不增加内核功能，而是用运行时证据验证启动流程和入口代码的作用。
 
 ---
 
@@ -269,11 +269,27 @@ Requirements：将结论限定在当前环境，区分装入地址与启动入�
 
 ---
 
-### 练习：理解内核启动中的程序入口操作
+### 练习1：理解内核启动中的程序入口操作
 
 **负责人：** 2410936-林子媛
 
-`la sp, bootstacktop` 与 `tail kern_init` 的详细解答由林子媛整理。
+```bash
+riscv64-unknown-elf-objdump -d bin/kernel
+```
+
+查看内核 ELF 的反汇编；输出同时显示指令编码和对应的汇编指令。
+
+**`la sp, bootstacktop` 做了什么，目的是什么？**
+
+A：`la` 将 `bootstacktop` 的地址写入栈指针寄存器 `sp`。栈空间由 `.space KSTACKSIZE` 预留，`la` 本身不分配内存。由于栈向低地址增长，初始化 `sp` 时让它指向这段空间的高地址边界。随后 `kern_init` 执行 `addi sp,sp,-16` 和 `sd ra,8(sp)`，说明进入 C 函数前需要先让 `sp` 指向内核自己的可用栈，才能安全地保存返回地址等调用状态。
+
+**`tail kern_init` 完成了什么操作，目的是什么？**
+
+A：`tail` 是尾调用伪指令，实际反汇编为 `j kern_init`，跳转时不向 `ra` 写入返回地址。它在设置好内核栈后，将控制权从汇编入口 `kern_entry` 交给内核初始化函数 `kern_init`。入口汇编没有后续工作，而 `kern_init` 声明为 `noreturn` 并最终进入无限循环，因此不需要建立返回 `entry.S` 的路径。
+
+下面是本机编译产物的验证截图：
+
+![kern_entry 和 kern_init 的反汇编](./images/lzy/entry-objdump.png)
 
 ---
 
@@ -281,7 +297,74 @@ Requirements：将结论限定在当前环境，区分装入地址与启动入�
 
 **负责人：** 2410933-马禹翔
 
-从复位到内核入口的 GDB 跟踪记录及答案由马禹翔整理。
+#### 调试步骤
+
+调试前先在实验目录执行 `make`，确保 `bin/kernel` 和 `bin/ucore.img` 已生成。使用两个终端：
+
+终端一启动暂停状态的 QEMU：
+
+```bash
+make debug
+```
+
+该目标带有 `-S -s`：`-S` 使 CPU 在执行第一条指令前暂停，`-s` 开启本机 `localhost:1234` GDB 远程调试端口。终端二启动支持 RISC-V 的 GDB 并连接：
+
+```bash
+gdb-multiarch bin/kernel
+```
+
+连接后输入以下命令，先检查复位向量的五条指令，再在内核入口设置断点：
+
+```gdb
+set arch riscv:rv64
+target remote localhost:1234
+info registers pc
+x/5i $pc
+stepi 5
+info registers pc
+x/5i $pc
+break *0x80200000
+continue
+info registers pc
+x/3i $pc
+stepi
+```
+
+在 QEMU `virt` 模拟机上，连接时 `pc` 为 `0x1000`。单步五条复位代码后，`pc` 到达 OpenSBI 固件入口 `0x80000000`。继续运行到断点后，`pc` 为 `0x80200000`；断点停在内核首条指令执行之前，查看反汇编并单步即可确认入口代码。
+
+#### 观察结果与问题回答
+
+本次使用 `gdb-multiarch` 17.2 连接 QEMU 4.1.1。连接后的初始程序计数器为 `0x1000`，GDB 反汇编得到复位向量的前五条指令：
+
+```text
+0x1000: auipc t0,0x0
+0x1004: addi  a1,t0,32
+0x1008: csrr  a0,mhartid
+0x100c: ld    t0,24(t0)
+0x1010: jr    t0
+```
+
+这部分记录了 GDB 在复位入口处的反汇编。逐条分析如下：
+
+1. `0x1000: auipc t0,0x0`：以当前 PC 为基准计算地址，令 `t0` 指向复位代码基址 `0x1000`。
+2. `0x1004: addi a1,t0,32`：计算得到 `a1=0x1020`，作为传给后续启动阶段的设备树（DTB）地址。
+3. `0x1008: csrr a0,mhartid`：读取当前硬件线程（hart）的编号，放入 `a0`。
+4. `0x100c: ld t0,24(t0)`：从 `0x1018` 的数据槽读取下一阶段入口地址；本次读取到 OpenSBI 基址 `0x80000000`。
+5. `0x1010: jr t0`：跳转到 `t0` 指向的 `0x80000000`，开始执行 OpenSBI 固件。
+
+执行 `stepi 5` 后，GDB 显示 `pc=0x80000000`，与上述跳转目标一致。`0x1000` 起的这些指令属于 QEMU `virt` 提供的复位 MROM，不属于本项目的内核镜像；真实硬件的复位代码由具体芯片平台决定。
+
+随后在 `0x80200000` 设置断点并继续运行，GDB 停在 `kern_entry`，表明 OpenSBI 已完成初始化并把控制权交给内核。入口处反汇编及单步结果如下：
+
+```text
+0x80200000 <kern_entry>:     auipc sp,0x3
+0x80200004 <kern_entry+4>:   mv    sp,sp
+0x80200008 <kern_entry+8>:   j     0x8020000a <kern_init>
+```
+
+在入口执行一次 `stepi` 后，GDB 显示 `pc=0x80200004`、`sp=0x80203000`。这确认了内核的第一条指令已经执行：`auipc` 与下一条 `mv` 组成汇编伪指令 `la sp, bootstacktop`，将栈指针设为栈顶；之后跳转到 `kern_init`。
+
+因此，本次 GDB 实测确认加电后的第一条指令位于 `0x1000`，负责准备启动参数并转入 `0x80000000` 的 OpenSBI；固件初始化后再将控制权交给链接入口 `0x80200000`。内核并非直接从复位地址运行。
 
 ---
 
@@ -315,7 +398,32 @@ Requirements：将结论限定在当前环境，区分装入地址与启动入�
 
 图3：`make qemu` 启动 OpenSBI 并输出内核消息。
 
-本次验证覆盖构建、正常启动及启动消息的 `%s` 输出。源码目录缺少 `tools/grade.sh`，未执行 `make grade`。
+
+
+
+GDB 调试截图使用 QEMU 4.1.1、OpenSBI v0.4 和 `gdb-multiarch` 17.2；实验环境表中的版本为其他构建与运行记录，此处按截图列出 GDB 验证环境。
+
+<img src="./images/gdb-reset-vector.png" alt="GDB 连接复位入口并查看前五条指令" width="549">
+
+图4：GDB 连接后 `$pc=0x1000`，查看 QEMU 复位向量的前五条指令。
+
+<img src="./images/gdb-opensbi-entry.png" alt="单步复位代码到达 OpenSBI" width="549">
+
+图5：执行 `stepi 5` 后，`$pc=0x80000000`，到达 OpenSBI 固件入口。
+
+<img src="./images/gdb-kernel-entry.png" alt="在内核入口设置断点并查看入口指令" width="549">
+
+图6：在 `0x80200000` 断下，确认 `kern_entry` 的入口指令。
+
+<img src="./images/gdb-stack-pointer.png" alt="单步内核入口并检查栈指针" width="549">
+
+图7：单步后 `$pc=0x80200004`、`$sp=0x80203000`，验证栈指针初始化。
+
+<img src="./images/qemu-kernel-boot.png" alt="QEMU 启动 OpenSBI 并输出内核启动消息" width="549">
+
+图8：QEMU 显示 OpenSBI 启动信息及内核输出 `(THU.CST) os is loading ...`。
+
+本次验证覆盖 GDB 远程连接、复位向量单步、OpenSBI 入口、内核入口断点、栈指针初始化和内核启动输出。
 
 ---
 
@@ -327,10 +435,12 @@ Requirements：将结论限定在当前环境，区分装入地址与启动入�
 2. **初始运行环境。** 设置栈、清零 `.bss` 为 C 代码准备条件，属于启动初始化；本实验还没有建立完整的进程和中断管理机制。
 3. **特权级与服务接口。** SBI 和系统调用都通过规定接口请求更高特权级服务，但这里是 S 模式内核请求 M 模式固件，系统调用则是用户程序请求操作系统。
 
-虚拟内存、进程调度、并发同步和文件系统尚未在本实验中实现。链接脚本的分段与对齐也不等于已经建立分页和地址隔离。
+
 
 ### AI 协作开发的经验
 
 小组成员执行命令并提供实际输出，AI 辅助分析代码和定位问题。将固件的下一阶段地址与链接脚本对应后，修复范围缩小到一项启动参数。修改后仍需重新运行验证，才能确认分析是否成立。
+
+GDB 跟踪确认了 QEMU `virt` 从 `0x1000` 的复位 MROM 进入 OpenSBI `0x80000000`，再转交至内核入口 `0x80200000` 的过程。通过断点、单步、反汇编和寄存器检查，验证了入口栈指针设置，并进一步理解镜像装入与控制权交接的区别。
 
 ---
