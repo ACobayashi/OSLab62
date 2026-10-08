@@ -400,7 +400,7 @@ stepi
 
 
 
-GDB 调试截图使用 QEMU 4.1.1、OpenSBI v0.4 和 `gdb-multiarch` 17.2；实验环境表中的版本为其他构建与运行记录，此处按截图列出 GDB 验证环境。
+以下为 GDB 启动验证的关键截图，记录了复位向量、OpenSBI 入口、内核入口、栈指针初始化和最终内核输出的关键状态。
 
 <img src="./images/myx/gdb-reset-vector.png" alt="GDB 连接复位入口并查看前五条指令" width="549">
 
