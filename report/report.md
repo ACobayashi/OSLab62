@@ -2,21 +2,21 @@
 
 ## 实验基本信息
 
-| 项目 | 内容 |
-|------|------|
-| **实验名称** | Lab1：最小可执行内核 |
+| 项目       | 内容                                  |
+| -------- | ----------------------------------- |
+| **实验名称** | Lab1：最小可执行内核                        |
 | **小组成员** | 2410673-韩羽宸、2410936-林子媛、2410933-马禹翔 |
-| **完成日期** | 2026-10-05 |
+| **完成日期** | 2026-10-05                          |
 
 本报告由小组三名成员共同完成，各模块按分工整理。
 
 ### 小组分工
 
-| 成员 | 负责的练习/模块 |
-|------|----------------|
+| 成员          | 负责的练习/模块                                                 |
+| ----------- | -------------------------------------------------------- |
 | 2410673-韩羽宸 | 编译、链接、镜像生成和 QEMU 正常启动；分析 Makefile、链接脚本、ELF/bin 和 SBI 输出链 |
-| 2410936-林子媛 | 入口代码、启动链分析与练习1 |
-| 2410933-马禹翔 | GDB 启动跟踪与练习2，以及提交前检查 |
+| 2410936-林子媛 | 入口代码、启动链分析与练习1                                           |
+| 2410933-马禹翔 | GDB 启动跟踪与练习2，以及提交前检查                                     |
 
 韩羽宸负责构建与输出分析、运行验证和相关提示词；林子媛负责入口代码分析与练习1；马禹翔负责 GDB 启动跟踪与练习2。
 
@@ -37,19 +37,19 @@
 
 实验在 Windows 的 WSL2 Ubuntu-22.04 中进行，源码目录为 `lab1/code_lab1`。
 
-| 工具或环境 | 版本/用途 |
-|------|------|
-| Ubuntu | 22.04.5 LTS |
-| GNU Make | 4.3，用于组织构建 |
-| RISC-V GCC | `riscv64-unknown-elf-gcc` 10.2.0 |
-| 系统 GNU ld | 2.38，用于观察系统默认链接脚本 |
-| QEMU | 7.0.0，模拟 RISC-V 计算机 |
-| OpenSBI | 1.0；运行输出中的 Runtime SBI Version 为 0.3 |
+| 工具或环境      | 版本/用途                                |
+| ---------- | ------------------------------------ |
+| Ubuntu     | 22.04.5 LTS                          |
+| GNU Make   | 4.3，用于组织构建                           |
+| RISC-V GCC | `riscv64-unknown-elf-gcc` 10.2.0     |
+| 系统 GNU ld  | 2.38，用于观察系统默认链接脚本                    |
+| QEMU       | 7.0.0，模拟 RISC-V 计算机                  |
+| OpenSBI    | 1.0；运行输出中的 Runtime SBI Version 为 0.3 |
 
 使用的 AI 工具如下：
 
-| 成员 | AI 编程工具 | 底层模型 | 备注 |
-|------|------------|---------|------|
+| 成员          | AI 编程工具        | 底层模型  | 备注            |
+| ----------- | -------------- | ----- | ------------- |
 | 2410673-韩羽宸 | OpenAI ChatGPT | GPT-6 | 辅助分析代码和定位启动问题 |
 
 ---
@@ -160,7 +160,6 @@ SECTIONS
 void sbi_console_putchar(unsigned char ch) {
     sbi_call(SBI_CONSOLE_PUTCHAR, ch, 0, 0);
 }
-
 ```
 
 输出服务编号为 1，字符作为第一个参数。`sbi_call` 将服务编号放入 `a7`、参数放入 `a0` 等寄存器，通过 `ecall` 请求 M 模式 OpenSBI 服务，返回值从 `a0` 取出。
@@ -195,10 +194,10 @@ Makefile 使用 RISC-V 交叉工具链，`function.mk` 组织源码、编译和�
 $(kernel): tools/kernel.ld
 
 $(kernel): $(KOBJS)
-	$(V)$(LD) $(LDFLAGS) -T tools/kernel.ld -o $@ $(KOBJS)
+    $(V)$(LD) $(LDFLAGS) -T tools/kernel.ld -o $@ $(KOBJS)
 
 $(UCOREIMG): $(kernel)
-	$(OBJCOPY) $(kernel) --strip-all -O binary $@
+    $(OBJCOPY) $(kernel) --strip-all -O binary $@
 ```
 
 `$(KOBJS)` 汇集目标文件，`$@` 表示当前目标。链接器按脚本生成 `bin/kernel`，随后 `objcopy` 生成 `bin/ucore.img`。`-g` 保留 ELF 调试信息，`-nostdinc`、`-nostdlib` 使内核使用自己的头文件和基础实现；独立函数、数据节与 `--gc-sections` 配合，可删除未使用的节。
@@ -269,11 +268,31 @@ Requirements：将结论限定在当前环境，区分装入地址与启动入�
 
 ---
 
-### 练习：理解内核启动中的程序入口操作
+### 练习1：理解内核启动中的程序入口操作
 
 **负责人：** 2410936-林子媛
 
-`la sp, bootstacktop` 与 `tail kern_init` 的详细解答由林子媛整理。
+```bash
+riscv64-unknown-elf-objdump -d bin/kernel
+```
+
+查看内核 ELF 的反汇编；输出同时显示指令编码和对应的汇编指令。
+
+**`la sp, bootstacktop` 做了什么，目的是什么？**
+
+A：`la` 将 `bootstacktop` 的地址写入栈指针寄存器 `sp`。栈空间由 `.space KSTACKSIZE` 预留，`la` 本身不分配内存。
+由于栈向低地址增长，初始化 `sp` 时让它指向这段空间的高地址边界。随后 `kern_init` 执行 `addi sp,sp,-16` 和 `sd ra,8(sp)`，说明进入 C 函数前需要先让 `sp` 指向内核自己的可用栈，才能安全地保存返回地址等调用状态。
+
+**`tail kern_init` 完成了什么操作，目的是什么？**
+
+A：`tail` 是尾调用伪指令，实际反汇编为 `j kern_init`，跳转时不向 `ra` 写入返回地址。
+它在设置好内核栈后，将控制权从汇编入口 `kern_entry` 交给内核初始化函数 `kern_init`。入口汇编没有后续工作，而 `kern_init` 声明为 `noreturn` 并最终进入无限循环，因此不需要建立返回 `entry.S` 的路径。
+
+
+
+下面是本机编译产物的验证截图：
+
+![kern_entry 和 kern_init 的反汇编](./images/lzy/entry-objdump.png)
 
 ---
 
