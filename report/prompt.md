@@ -323,3 +323,122 @@ M 模式 OpenSBI 处理；澄清 ecall 是受控陷入而非 cprintf 自行提�
 `kern_init` 并没有加载 `cprintf`；它调用已经编译并链接进内核的 `cprintf` 输出字符串。调用链为 `kern_init → cprintf → vcprintf → vprintfmt → cputch → cons_putc → sbi_console_putchar → sbi_call → ecall → OpenSBI`。`cprintf` 负责格式化输出，不是输入交互接口。
 
 内核在 S 模式执行 `ecall` 后，当前 SBI 配置下由 M 模式 OpenSBI 接收并处理控制台输出服务。`sbi_call` 把服务号放入 `x17/a7`、参数放入 `x10/a0` 等寄存器；本工程中 `SBI_CONSOLE_PUTCHAR` 的值为 1。准确地说，是 SBI 调用通过 `ecall` 进入固件处理，不是 `cprintf` 自身提权。
+
+---
+
+**记录人：** 2410936-林子媛。AI 工具：OpenAI Codex；本次整理使用的底层模型：GPT-6。
+
+以下三条按本人的实际提问、源码检查、反汇编和 GDB 观察整理为可复用的四段式提示词；不是历史聊天记录的逐字转录。
+
+## 提示词 12：分析入口代码中的内核栈与控制权交接
+
+### 目的
+
+回答练习 1 的两问，弄清 `la sp, bootstacktop` 和 `tail kern_init` 分别做什么，以及为什么进入 C 函数前要设置内核栈。
+
+### 完整提示词
+
+```text
+[PROMPT]
+请结合 kern/init/entry.S、kern/init/init.c 和栈相关宏，解释
+la sp, bootstacktop 与 tail kern_init 的实际作用和目的。
+重点区分“汇编预留栈空间”与“运行时设置 sp”，说明为何不能沿用
+OpenSBI 留下的栈，以及 tail 为什么不需要建立返回入口汇编的路径。
+
+[RELY]
+entry.S 在 .data 段用 .align PGSHIFT 对齐 bootstack，用
+.space KSTACKSIZE 预留空间，并把 bootstacktop 放在空间末端。
+kern_entry 先执行 la sp, bootstacktop，再 tail kern_init。
+kern_init 声明为 noreturn，执行清零、输出后进入无限循环。
+
+[GUARANTEE]
+只依据当前源码和构建产物回答，不把 la 描述为分配内存，
+不把 tail 描述为会写入 ra 的普通函数调用；不修改内核代码。
+
+[SPECIFICATION]
+解释栈向低地址增长、sp 指向栈顶、C 函数调用需要可用栈的原因。
+说明 tail 交接执行权后为何不需要返回 kern_entry，并给出适合
+写入实验报告的简洁表述。
+```
+
+### 结果与后续调整
+
+核对源码后，将回答中的“开辟内核栈”改为“在镜像中预留栈空间，启动时把 `sp` 设为栈顶”：`.space KSTACKSIZE` 才负责预留，`la` 只设置寄存器。`tail kern_init` 在入口设置好栈后把控制权交给 C 初始化函数，因 `kern_init` 不返回，不需要为入口汇编保留返回地址。这一澄清已用于报告的练习 1 答案。
+
+## 提示词 13：用反汇编核对入口伪指令和栈布局
+
+### 目的
+
+用本机编译产物验证入口地址、伪指令展开和栈顶地址，避免仅凭源码推断运行效果。
+
+### 完整提示词
+
+```text
+[PROMPT]
+我执行 riscv64-unknown-elf-objdump -d bin/kernel 后看到
+kern_entry 位于 0x80200000，后面是 auipc sp,0x3、mv sp,sp
+和 j 0x8020000a <kern_init>。请对照 entry.S 解释这些指令
+与 la、tail 的关系，并告诉我报告应称它们为机器码还是反汇编。
+
+[RELY]
+当前内核 ELF 为 bin/kernel，原始镜像为 bin/ucore.img。
+entry.S 中使用 la sp, bootstacktop 和 tail kern_init。
+本机构建的符号表显示 bootstack=0x80201000、
+bootstacktop=0x80203000、kern_init=0x8020000a。
+
+[GUARANTEE]
+以当前 ELF 的实际反汇编和符号表为依据；区分指令编码、
+汇编助记符和汇编伪指令，不把本次编译的展开形式当作所有
+工具链和编译选项下都固定不变的形式。
+
+[SPECIFICATION]
+说明 objdump -d 同时显示地址、指令编码与反汇编助记符。
+计算 bootstack 到 bootstacktop 的字节差，解释栈顶地址
+为何与 la 的目标相符；解释 j 不写 ra，并给出可放入报告的
+验证结论。不要修改 Makefile 或源码。
+```
+
+### 结果与后续调整
+
+用 `objdump -d` 和符号表交叉核对：`0x80200000` 起的两条指令实现本次构建中的 `la`，`0x80200008` 的 `j` 对应 `tail`，目标为 `0x8020000a`。`bootstacktop-bootstack=0x2000`，即 8192 字节。报告将截图描述为“内核 ELF 的反汇编，包含指令编码和对应汇编”，而非单称“机器码”。
+
+## 提示词 14：单步验证设置 sp 和 tail 不改写 ra
+
+### 目的
+
+通过本人 GDB 记录验证练习 1 的两个关键结论，并区分 OpenSBI 阶段与内核入口阶段。
+
+### 完整提示词
+
+```text
+[PROMPT]
+我用 riscv64-unknown-elf-gdb -q bin/kernel 连接 QEMU 的
+localhost:1234，在 kern_entry 断下。断点处 pc=0x80200000、
+sp=0x80045e30；单步入口首条指令后 pc=0x80200004、
+sp=0x80203000。继续单步到 kern_init 后，pc=0x8020000a，
+ra 仍为 0x80005b52。请解释这些变化验证了什么，
+特别是 tail 不保存返回地址如何从寄存器状态体现。
+
+[RELY]
+本机 macOS 使用 QEMU -machine virt -nographic -bios default
+-kernel bin/ucore.img -s -S，GDB 执行 set architecture riscv:rv64、
+target remote localhost:1234、b *kern_entry、c 和 si。
+QEMU 复位时 pc=0x1000，OpenSBI 的下一阶段地址为 0x80200000。
+当前 Makefile 的 debug 目标使用 -device loader，与本次
+-kernel 调试命令不同，不把两者的启动结果混写。
+
+[GUARANTEE]
+只解释以上实际观察到的寄存器和反汇编结果；不声称在本机
+通过 make debug 得到相同结果，也不把 ra 的旧值说成
+返回 kern_entry 的地址。不修改 Makefile 或内核源码。
+
+[SPECIFICATION]
+按“断点前旧 sp → 执行 la 后的新 sp → 跳转后的 pc/ra”
+说明。区分 GDB 的 si 单条机器指令与 la/tail 伪指令；
+解释 OpenSBI 已在内核入口前完成控制权交接，以及
+为何需要结合源码和反汇编判断 tail 的作用。
+```
+
+### 结果与后续调整
+
+GDB 在 `kern_entry` 断下时，`sp` 仍为进入内核前的值；执行首条入口指令后，`sp` 变为 `0x80203000`。继续单步到 `kern_init` 时，`pc` 到达 `0x8020000a`，而 `ra` 始终为 `0x80005b52`，表明该跳转没有写入新的返回地址。报告据此补充了本人对练习 1 的运行时验证；成员 3 的练习 2 则独立记录复位向量到内核入口的完整跟踪。
