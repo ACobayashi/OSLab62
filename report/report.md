@@ -35,7 +35,7 @@
 
 ## 二、实验环境
 
-实验在 Windows 的 WSL2 Ubuntu-22.04 中进行，源码目录为 `lab1/code_lab1`。
+实验在 Windows 的 WSL2 Ubuntu-22.04 中进行，源码目录为 `lab1/code`。
 
 | 工具或环境      | 版本/用途                                |
 | ---------- | ------------------------------------ |
@@ -88,7 +88,7 @@ flowchart LR
 
 **需要实现/修改的函数：**
 
-本次沿用已有 C 函数，修改的是 Makefile 的 `qemu` 规则。分析中涉及的主要接口如下：
+这一部分的 C 函数已经在工程中实现，因此主要工作是理解构建和输出过程，并检查实际运行结果。最后需要修改的是 Makefile 中的 `qemu` 规则，涉及的主要接口如下：
 
 ```c
 int cprintf(const char *fmt, ...);
@@ -105,7 +105,7 @@ uint64_t sbi_call(uint64_t sbi_type, uint64_t arg0,
 
 ##### 1. 项目组成和执行流
 
-`Makefile` 和 `tools/function.mk` 负责生成构建规则，`tools/kernel.ld` 负责安排链接后的内存布局。`entry.S` 设置栈指针，再跳转到 `init.c` 中的 `kern_init`。输出功能由 `stdio.c`、`printfmt.c`、`console.c` 和 `sbi.c` 共同完成。
+我先从手册介绍的文件结构入手，把构建和执行过程对应起来。`Makefile` 和 `tools/function.mk` 组织构建规则，`tools/kernel.ld` 安排内存布局。开始执行后，`entry.S` 设置栈指针，再跳转到 `kern_init`；启动消息则由 `stdio.c`、`printfmt.c`、`console.c` 和 `sbi.c` 共同输出。
 
 `kern_init` 的主要操作如下：
 
@@ -116,19 +116,19 @@ while (1)
     ;
 ```
 
-`edata` 和 `end` 由链接器定义，用于确定清零范围。随后输出启动消息，进入循环，这是当前最小内核的预期运行状态。
+这里先利用链接器提供的 `edata`、`end` 清零初始化区域，再输出启动消息。输出之后进入循环，所以看到消息后终端不再变化，与当前最小内核的代码是相符的。
 
 ##### 2. OpenSBI、ELF 和二进制镜像
 
-QEMU 根据启动参数装入镜像，OpenSBI 在 M 模式完成底层初始化，再将控制权交给 S 模式内核；之后内核仍可通过 SBI 请求字符输出等服务。
+接着对照手册看启动过程，QEMU 根据参数把固件和镜像装入内存，OpenSBI 在 M 模式完成底层初始化，再交给 S 模式内核执行。内核运行后，还可以通过 SBI 请求字符输出等服务。
 
-`bin/kernel` 是包含入口、装入和调试信息的 ELF 文件；`bin/ucore.img` 是经 `objcopy` 转换得到的原始镜像，没有 ELF 头部，需要与加载配置配合。实际 `file` 检查分别显示 RISC-V 64 位 ELF 和 `data`。
+构建时会得到两个文件。`bin/kernel` 是 ELF，保留入口、装入和调试信息；`bin/ucore.img` 是经过 `objcopy` 转换的原始镜像，没有 ELF 头部，需要与加载配置配合。执行 `file` 检查后，两者分别显示为 RISC-V 64 位 ELF 和 `data`，与这一过程一致。
 
 `.bss` 通常只在 ELF 中描述所需空间，因此启动时仍需清零。
 
 ##### 3. 内存布局、链接脚本和入口点
 
-`ld --verbose` 展示的是宿主机默认脚本，架构为 x86-64，入口为 `_start`。内核实际使用 RISC-V 链接器和 `tools/kernel.ld`。
+按照手册执行 `ld --verbose` 时，我看到的是 x86-64 架构和 `_start` 入口。对照 Makefile 后可以发现，这是宿主机的默认脚本；内核实际使用 RISC-V 链接器和 `tools/kernel.ld`。
 
 内核链接脚本的关键设置如下：
 
@@ -148,13 +148,13 @@ SECTIONS
 }
 ```
 
-这段代码节选自脚本开头。`OUTPUT_ARCH` 指定架构，`ENTRY` 声明入口，位置计数器 `.` 从 `0x80200000` 开始，并优先收集入口代码。本次 ELF 的入口地址为 `0x80200000`，与成功启动时的下一阶段地址一致。
+从脚本开头可以看到，`OUTPUT_ARCH` 指定架构，`ENTRY` 声明入口，而位置计数器 `.` 从 `0x80200000` 开始，入口代码也被优先收集到 `.text`。本次 ELF 的入口地址为 `0x80200000`，后面检查启动结果时，就可以用它与固件的下一阶段地址进行比较。
 
-后续段分别保存只读数据、已初始化数据和零初始化数据。`ALIGN(0x1000)` 将数据起始位置对齐到 4096 字节边界；`edata` 位于初始化数据之后，`end` 位于 `.bss` 之后，两者确定清零范围。启动栈由 `entry.S` 预留并设置，具体入口操作由林子媛分析。
+再往后是只读数据、已初始化数据和零初始化数据。`ALIGN(0x1000)` 将数据起始位置对齐到 4096 字节边界，`edata` 和 `end` 分别位于初始化数据和 `.bss` 之后。这也解释了前面 `kern_init` 为什么能用两个符号确定清零范围。启动栈由 `entry.S` 预留并设置，具体入口操作由林子媛分析。
 
 ##### 4. 从 SBI 到 stdio
 
-本工程使用传统 SBI 接口，字符输出封装如下：
+手册从 SBI 字符输出开始，逐步封装到 stdio。先看最底层的字符输出函数：
 
 ```c
 void sbi_console_putchar(unsigned char ch) {
@@ -162,9 +162,9 @@ void sbi_console_putchar(unsigned char ch) {
 }
 ```
 
-输出服务编号为 1，字符作为第一个参数。`sbi_call` 将服务编号放入 `a7`、参数放入 `a0` 等寄存器，通过 `ecall` 请求 M 模式 OpenSBI 服务，返回值从 `a0` 取出。
+这个函数把字符交给 `sbi_call`，使用的输出服务编号为 1。`sbi_call` 将编号放入 `a7`、参数放入 `a0` 等寄存器，再通过 `ecall` 请求 OpenSBI 服务，返回值从 `a0` 取出。这样，上层就可以通过函数调用输出字符。
 
-格式化输出的主要代码如下：
+在这个基础上，格式化输出通过 `vcprintf` 把解析工作交给 `vprintfmt`：
 
 ```c
 int vcprintf(const char *fmt, va_list ap) {
@@ -174,7 +174,7 @@ int vcprintf(const char *fmt, va_list ap) {
 }
 ```
 
-`cprintf` 通过 `va_start`、`va_end` 管理可变参数，再调用 `vcprintf`。`vprintfmt` 解析格式，通过 `cputch` 回调逐字符输出并计数。完整调用链为：
+`cprintf` 先通过 `va_start`、`va_end` 管理可变参数，再调用这里的 `vcprintf`。`vprintfmt` 解析格式，遇到需要输出的字符就调用 `cputch`，同时统计字符数。沿着调用继续往下看，就能把启动消息的输出过程串起来：
 
 ```text
 kern_init → cprintf → vcprintf → vprintfmt
@@ -182,11 +182,11 @@ kern_init → cprintf → vcprintf → vprintfmt
          → sbi_call → ecall → OpenSBI 控制台服务
 ```
 
-这样，格式解析与底层输出分开，上层可以使用统一的 `cprintf` 接口。
+这样处理后，格式解析和实际字符输出各自负责一部分工作，`kern_init` 只需要调用 `cprintf`。
 
 ##### 5. Makefile 中的编译、链接和镜像生成
 
-Makefile 使用 RISC-V 交叉工具链，`function.mk` 组织源码、编译和依赖规则，Make 根据依赖及更新时间决定是否重建。
+最后回到 Makefile，我把执行 `make` 时的输出与规则逐项对应。工程使用 RISC-V 交叉工具链，`function.mk` 组织源码、编译和依赖规则，Make 根据依赖关系和文件更新时间决定是否重新构建。
 
 链接和镜像转换的核心命令如下：
 
@@ -200,54 +200,31 @@ $(UCOREIMG): $(kernel)
     $(OBJCOPY) $(kernel) --strip-all -O binary $@
 ```
 
-`$(KOBJS)` 汇集目标文件，`$@` 表示当前目标。链接器按脚本生成 `bin/kernel`，随后 `objcopy` 生成 `bin/ucore.img`。`-g` 保留 ELF 调试信息，`-nostdinc`、`-nostdlib` 使内核使用自己的头文件和基础实现；独立函数、数据节与 `--gc-sections` 配合，可删除未使用的节。
+这里的 `$(KOBJS)` 汇集目标文件，`$@` 表示当前目标。目标文件先按链接脚本生成 `bin/kernel`，随后再转换为 `bin/ucore.img`。`-g` 让 ELF 保留调试信息，`-nostdinc`、`-nostdlib` 使内核使用自己的头文件和基础实现；独立函数、数据节与 `--gc-sections` 配合，可以去掉未使用的节。
 
 #### 最终提示词
 
-下面将启动修复任务整理为手册要求的四段式提示词，作为本模块的最终任务规格：
+运行时没有出现内核消息，因此进一步提出了下面的问题：
 
 ```text
-[PROMPT]
-make 已经成功，但 make qemu 只打印了 OpenSBI 信息，没有出现内核消息。
-请结合手册、Makefile 和链接脚本判断问题在哪个阶段。
-原来的 loader 参数和 -kernel 参数有什么区别？确认原因后，直接修改
-Makefile 的 qemu 规则，说明为什么这样改，以及怎么判断修复成功。
-
-[RELY]
-环境：Ubuntu 22.04、QEMU 7.0.0、OpenSBI 1.0。
-原始参数：-device loader,file=$(UCOREIMG),addr=0x80200000。
-异常输出：Domain0 Next Address 为 0，未出现内核启动消息。
-镜像：bin/ucore.img；链接基址和当前入口地址为 0x80200000。
-kern_init 打印“(THU.CST) os is loading ...”后进入循环。
-
-[GUARANTEE]
-只修改 Makefile 的 qemu 目标，将加载参数改为 -kernel $(UCOREIMG)。
-保留编译、链接规则、debug 目标和内核源码，给出修改差异及复验依据。
-
-[SPECIFICATION]
-Pre-Condition：bin/kernel 和 bin/ucore.img 已成功生成。
-Post-Condition：OpenSBI 下一阶段地址为 0x80200000，模式为 S-mode，
-随后输出内核消息。
-Case 1：只有固件信息时，检查下一阶段地址，不能直接判定内核已启动。
-Case 2：内核输出后停在循环中，符合当前 kern_init 的预期行为。
-Requirements：将结论限定在当前环境，区分装入地址与启动入口配置。
+make 成功了，但 make qemu 只停在 OpenSBI，Next Address 是 0。帮我看一下原因，修好 Makefile 的启动参数。
 ```
 
 其他分析提示词见 [提示词汇总](./prompt.md)。
 
 #### 实现迭代过程
 
-本部分沿用已有内核，经历了首次构建运行和修改启动参数后的复验两个阶段。
+这次先用原有配置构建和运行，发现启动问题后，再修改参数重新验证。
 
 ##### 第一次迭代
 
 **遇到的问题：**
 
-`make` 完成编译、链接和镜像生成，但执行原始 `make qemu` 后，只出现 OpenSBI 信息，没有内核启动消息。输出中的 `Domain0 Next Address` 为 `0x0000000000000000`，没有指向内核入口。
+我先执行 `make`，编译、链接和镜像生成都顺利完成。但运行 `make qemu` 后，终端只出现 OpenSBI 信息，没有内核启动消息。再检查输出，发现 `Domain0 Next Address` 为 `0x0000000000000000`，没有指向内核入口。
 
 **问题解决策略：**
 
-原来的 `-device loader` 指定了镜像装入地址，但在本机默认固件环境中没有正确完成下一阶段入口的配置。结合实际输出，将正常运行目标改为由 QEMU 的 `-kernel` 参数处理内核启动，具体改动为：
+结合链接脚本和 AI 的分析继续检查，原来的 `-device loader` 虽然指定了装入地址，但在本机默认固件环境中没有正确配置下一阶段入口。因此将正常运行目标改用 `-kernel`，具体差异如下：
 
 ```diff
 -        -device loader,file=$(UCOREIMG),addr=0x80200000
@@ -260,11 +237,11 @@ Requirements：将结论限定在当前环境，区分装入地址与启动入�
 
 **最终结果：**
 
-重新执行 `make qemu`，下一阶段地址变为 `0x0000000080200000`，模式为 `S-mode`，随后出现 `(THU.CST) os is loading ...`，说明已执行到内核输出位置。
+修改后再次执行 `make qemu`，下一阶段地址变为 `0x0000000080200000`，模式为 `S-mode`，随后出现了 `(THU.CST) os is loading ...`。这时可以确认，控制权已经交给内核，并执行到了输出位置。
 
 **关键改进点总结：**
 
-构建成功后，还需将固件的下一阶段地址与内核入口比较，单独验证启动交接。
+这次排查中，构建结果和启动结果需要分开看。即使镜像已经生成，也要继续检查固件的下一阶段地址和内核消息，才能判断是否真正启动成功。
 
 ---
 
