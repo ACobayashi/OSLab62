@@ -35,8 +35,6 @@
 
 ## 二、实验环境
 
-小组成员使用不同环境。韩羽宸在 Windows 的 WSL2 Ubuntu-22.04 中完成构建与输出分析，源码目录为 `lab1/code`；林子媛在 macOS 上完成入口代码分析与验证，当前仓库中的源码目录为 `code`。
-
 | 工具或环境      | 版本/用途                                |
 | ---------- | ------------------------------------ |
 | Ubuntu     | 22.04.5 LTS                          |
@@ -46,7 +44,7 @@
 | QEMU       | 7.0.0，模拟 RISC-V 计算机                  |
 | OpenSBI    | 1.0；运行输出中的 Runtime SBI Version 为 0.3 |
 
-林子媛使用 macOS 26.6.2、RISC-V GCC 16.2.0、RISC-V GDB 17.2、QEMU 11.1.1 和 GNU Make 3.81。不同成员的工具版本与调试命令以各自的实测记录为准。
+
 
 使用的 AI 工具如下：
 
@@ -271,7 +269,7 @@ A：`tail` 是尾调用伪指令，实际反汇编为 `j kern_init`，跳转时�
 
 ![kern_entry 和 kern_init 的反汇编](./images/lzy/entry-objdump.png)
 
-林子媛在 macOS 上的 `objdump` 结果显示：`kern_entry` 位于 `0x80200000`，`la sp, bootstacktop` 对应 `auipc sp,0x3` 与 `mv sp,sp`，`tail kern_init` 对应跳转到 `0x8020000a`。符号表中 `bootstack=0x80201000`、`bootstacktop=0x80203000`，两者相差 `0x2000`（8192 字节），与预留的内核栈大小一致。GDB 单步执行入口首条指令后，`sp` 由 `0x80045e30` 变为 `0x80203000`；继续执行跳转后，`pc=0x8020000a`，`ra` 保持 `0x80005b52` 不变。这些观察分别验证了栈指针初始化和 `tail` 不保存新返回地址的作用。这里的 `sp` 被设置为已预留栈顶地址；`la` 将该地址写入寄存器，不负责分配栈空间。
+林子媛： `objdump` 结果显示：`kern_entry` 位于 `0x80200000`，`la sp, bootstacktop` 对应 `auipc sp,0x3` 与 `mv sp,sp`，`tail kern_init` 对应跳转到 `0x8020000a`。符号表中 `bootstack=0x80201000`、`bootstacktop=0x80203000`，两者相差 `0x2000`（8192 字节），与预留的内核栈大小一致。GDB 单步执行入口首条指令后，`sp` 由 `0x80045e30` 变为 `0x80203000`；继续执行跳转后，`pc=0x8020000a`，`ra` 保持 `0x80005b52` 不变。这些观察分别验证了栈指针初始化和 `tail` 不保存新返回地址的作用。这里的 `sp` 被设置为已预留栈顶地址；`la` 将该地址写入寄存器，不负责分配栈空间。
 
 ---
 
