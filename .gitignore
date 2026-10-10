@@ -3,6 +3,9 @@
 # Local backup of the originally received partial folder
 /imports/
 
+# Local offline lab handbook; never commit or upload
+/实验手册/
+
 # Local RISC-V command shims (the real tools are installed by Homebrew)
 /tools/
 
