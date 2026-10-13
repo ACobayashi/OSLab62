@@ -1,18 +1,24 @@
-# Operating System Labs
+# Lab1：最小可执行内核
 
-本仓库用于 uCore on RISC-V64 操作系统实验。
+## 实验内容
 
-## 目录
+构建能够启动并输出信息的最小 RISC-V64 内核，分析交叉编译、链接脚本、ELF 文件和内核镜像的生成过程，使用 QEMU 验证内核启动及 SBI 输出。
+
+通过 GDB 跟踪复位代码、OpenSBI 和内核入口，观察栈指针的设置、C 语言初始化及相关寄存器的变化。
+
+## 目录结构
 
 ```text
 .
-|-- code/                 # 实验一源代码
+|-- code/
+|   |-- kern/             # 内核入口、初始化和控制台输出
+|   |-- libs/             # SBI 接口、格式化输出等基础函数
+|   |-- tools/            # 链接脚本和构建辅助规则
+|   `-- Makefile          # 编译、运行与调试规则
 |-- report/
-|   |-- images/           # 测试结果截图
-|   |-- prompt.md         # 本实验使用的全部提示词
-|   `-- report.md         # 实验报告模板
-|-- .gitignore
+|   |-- images/           # 运行与调试截图
+|   |-- prompt.md         # AI 提示词记录
+|   |-- report.md         # 实验报告
+|   `-- report.pdf        # 实验报告 PDF
 `-- README.md
 ```
-
-本分支名为 `lab1`。后续每次实验分别建立 `lab2`、`lab3` 等分支，并保持相同的 `code/`、`report/` 结构。
