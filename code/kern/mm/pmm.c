@@ -34,7 +34,8 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    pmm_manager = &default_pmm_manager;
+    //lab2 function2-2 2410673: use the completed Best-Fit manager.
+    pmm_manager = &best_fit_pmm_manager;
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -61,7 +62,62 @@ size_t nr_free_pages(void) {
     return pmm_manager->nr_free_pages();
 }
 
-//lab2 function1 YOUR CODE
+//lab2 function1 2410673
+static void page_init(void) {
+    extern char end[];
+    uint64_t mem_base = get_memory_base();
+    uint64_t mem_size = get_memory_size();
+
+    // This framework describes DRAM starting at the fixed nbase page number.
+    if (mem_base != DRAM_BASE || mem_size == 0 ||
+        mem_size > (uint64_t)-1 - mem_base) {
+        panic("page_init: invalid physical memory range from DTB");
+    }
+    uint64_t mem_end = mem_base + mem_size;
+    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+
+    cprintf("physical memory map:\n");
+    cprintf("  memory: 0x%016lx, [0x%016lx, 0x%016lx].\n",
+            mem_size, mem_base, mem_end - 1);
+
+    uintptr_t maxpa = mem_end;
+    if (maxpa > PHYSICAL_MEMORY_END) {
+        maxpa = PHYSICAL_MEMORY_END;
+    }
+    maxpa = ROUNDDOWN(maxpa, PGSIZE);
+    if (maxpa <= DRAM_BASE || PADDR(end) > maxpa) {
+        panic("page_init: physical memory does not cover the kernel");
+    }
+    npage = PPN(maxpa);
+
+    // Descriptors live after the kernel, and their own pages stay reserved.
+    pages = (struct Page *)ROUNDUP((uintptr_t)end, PGSIZE);
+    uintptr_t pages_pa = PADDR(pages);
+    size_t page_count = npage - nbase;
+    if (pages_pa > maxpa ||
+        page_count > (maxpa - pages_pa) / sizeof(struct Page)) {
+        panic("page_init: not enough memory for page descriptors");
+    }
+
+    for (size_t i = 0; i < page_count; i++) {
+        struct Page *p = pages + i;
+        p->flags = 0;
+        p->property = 0;
+        set_page_ref(p, 0);
+        SetPageReserved(p);
+        list_init(&p->page_link);
+    }
+
+    uintptr_t freemem = ROUNDUP(pages_pa +
+                               page_count * sizeof(struct Page), PGSIZE);
+    cprintf("  managed: [0x%016lx, 0x%016lx).\n",
+            (uintptr_t)DRAM_BASE, maxpa);
+    cprintf("  free:    [0x%016lx, 0x%016lx), %lu pages.\n",
+            freemem, maxpa, (unsigned long)((maxpa - freemem) / PGSIZE));
+    if (freemem < maxpa) {
+        init_memmap(pa2page(freemem), (maxpa - freemem) / PGSIZE);
+    }
+}
 
 /* pmm_init - initialize the physical memory management */
 void pmm_init(void) {
