@@ -10,7 +10,10 @@ GCCPREFIX := riscv64-unknown-elf-
 #endif
 
 ifndef QEMU
-QEMU := qemu-system-riscv64
+# lab2 integration 2410673: provide the OpenSBI next-stage entry metadata.
+# Keep the existing loader device for the raw image's physical placement.
+# Recursive expansion is needed because UCOREIMG is defined later below.
+QEMU = qemu-system-riscv64 -kernel $(UCOREIMG)
 endif
 
 ifndef SPIKE

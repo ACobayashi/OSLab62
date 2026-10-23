@@ -6,6 +6,12 @@
 #include <string.h>
 #include <dtb.h>
 
+// lab2 integration 2410673: Buddy rounds page requests up, whereas SLUB
+// requires an exact-page backend. Validate the two test configurations early.
+#if defined(CONFIG_BUDDY_PMM) && defined(SLUB_TEST)
+#error "SLUB_TEST requires the default Best-Fit configuration; do not combine with BUDDY=1"
+#endif
+
 int kern_init(void) __attribute__((noreturn));
 void grade_backtrace(void);
 void print_kerninfo(void);
@@ -40,10 +46,15 @@ int kern_init(void) {
     // grade_backtrace();
     pmm_init();  // init physical memory management
 
+    // lab2 integration 2410673: keep the Buddy page-only test independent.
+#ifdef CONFIG_BUDDY_PMM
+    cprintf("[Buddy] page-only configuration: SLUB is not enabled\n");
+#else
     // lab2 2410936: the object layer starts after the page allocator checks.
     slub_init();
 #ifdef SLUB_TEST
     slub_check();
+#endif
 #endif
 
     /* do nothing */
