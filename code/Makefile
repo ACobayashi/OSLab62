@@ -109,6 +109,12 @@ KSRCDIR		+= kern/init \
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
+# lab2 2410933: keep Best Fit as the default manager, while allowing the
+# Buddy allocator to be selected explicitly for its independent kernel test.
+ifeq ($(BUDDY),1)
+KCFLAGS		+= -DCONFIG_BUDDY_PMM
+endif
+
 ifeq ($(MAKECMDGOALS),test)
 $(call add_files_cc2,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 else

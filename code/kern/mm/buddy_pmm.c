@@ -1,6 +1,7 @@
 #include <buddy_pmm.h>
 #include <list.h>
 #include <pmm.h>
+#include <stdio.h>
 
 // lab2 2410933: Buddy physical page allocator.
 
@@ -225,6 +226,7 @@ static void
 buddy_check(void) {
     size_t nr_free_store = buddy_nr_free_pages();
     assert(buddy_alloc_pages(nr_free_store + 1) == NULL);
+    cprintf("[Buddy] oversized allocation: PASS\n");
 
     // Remove one aligned arena from the real allocator, then temporarily
     // isolate the free lists so the split/merge expectations are deterministic.
@@ -272,6 +274,7 @@ buddy_check(void) {
     assert(p2->property == 2);
     buddy_free_pages(p2, 2);
     assert(buddy_nr_free_pages() == 16);
+    cprintf("[Buddy] order split and buddy merge: PASS\n");
 
     // Non-power-of-two requests round up to order-2 blocks and do not overlap.
     struct Page *p3 = buddy_alloc_pages(3);
@@ -296,6 +299,7 @@ buddy_check(void) {
     buddy_free_pages(p6, 5);
     buddy_free_pages(p5, 5);
     assert(buddy_nr_free_pages() == 16);
+    cprintf("[Buddy] rounding, non-overlap and exhaustion: PASS\n");
 
     // Blocks [2,4) and [4,6) are adjacent but are not buddies.  Keep each
     // block's real buddy allocated and verify that these two stay separate.
@@ -319,6 +323,7 @@ buddy_check(void) {
     buddy_free_pages(q3, 2);
     assert(buddy_nr_free_pages() == 16);
     assert(buddy_free_areas[4].nr_blocks == 1);
+    cprintf("[Buddy] adjacent non-buddies and recursive merge: PASS\n");
 
     // Remove the complete arena and re-register only an unaligned 13-page
     // subrange.  This checks decomposition at both alignment boundaries.
@@ -382,6 +387,8 @@ buddy_check(void) {
 
     buddy_free_pages(arena, 16);
     assert(buddy_nr_free_pages() == nr_free_store);
+    cprintf("[Buddy] unaligned 13-page range and state restore: PASS\n");
+    cprintf("[Buddy] all boundary tests: PASS\n");
 }
 
 const struct pmm_manager buddy_pmm_manager = {
