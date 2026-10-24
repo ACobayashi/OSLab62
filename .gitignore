@@ -1,5 +1,9 @@
 .DS_Store
 
+# Personal build trees, debug environments, and temporary run logs
+/slub-notes/
+/tests/slub/
+
 # Local backup of the originally received partial folder
 /imports/
 
