@@ -31,7 +31,7 @@ run_case() {
 
     echo "Running $label..."
     timeout "${seconds}s" qemu-system-riscv64 \
-        -machine virt -nographic -bios default \
+        -machine virt -nographic -bios default -kernel bin/ucore.img \
         -device loader,file=bin/ucore.img,addr=0x80200000 \
         -serial file:"$output" -monitor none -no-reboot >/dev/null 2>&1 || true
 

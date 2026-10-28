@@ -4,7 +4,146 @@
 #include <best_fit_pmm.h>
 #include <stdio.h>
 
-//lab2 请补充你在lab2中的代码
+//lab2 function2-2 2410673
+static free_area_t free_area;
+
+#define free_list (free_area.free_list)
+#define nr_free (free_area.nr_free)
+
+static void best_fit_check(void);
+
+static void
+best_fit_init(void) {
+    list_init(&free_list);
+    nr_free = 0;
+}
+
+// Keep block heads in address order, so only the two neighbors can merge.
+static void
+best_fit_insert_block(struct Page *base) {
+    list_entry_t *next = list_next(&free_list);
+    while (next != &free_list && le2page(next, page_link) < base) {
+        next = list_next(next);
+    }
+    list_entry_t *prev = list_prev(next);
+    if (prev != &free_list) {
+        struct Page *left = le2page(prev, page_link);
+        assert(left + left->property <= base);
+    }
+    if (next != &free_list) {
+        assert(base + base->property <= le2page(next, page_link));
+    }
+    list_add_before(next, &base->page_link);
+
+    if (prev != &free_list) {
+        struct Page *left = le2page(prev, page_link);
+        if (left + left->property == base) {
+            left->property += base->property;
+            ClearPageProperty(base);
+            base->property = 0;
+            list_del_init(&base->page_link);
+            base = left;
+        }
+    }
+    next = list_next(&base->page_link);
+    if (next != &free_list) {
+        struct Page *right = le2page(next, page_link);
+        if (base + base->property == right) {
+            base->property += right->property;
+            ClearPageProperty(right);
+            right->property = 0;
+            list_del_init(&right->page_link);
+        }
+    }
+}
+
+static void
+best_fit_init_memmap(struct Page *base, size_t n) {
+    assert(n > 0);
+    assert(base >= pages && base < pages + (npage - nbase));
+    assert(n <= (size_t)(pages + (npage - nbase) - base));
+    for (struct Page *p = base; p < base + n; p++) {
+        assert(PageReserved(p));
+        p->flags = 0;
+        p->property = 0;
+        set_page_ref(p, 0);
+        list_init(&p->page_link);
+    }
+    base->property = n;
+    SetPageProperty(base);
+    best_fit_insert_block(base);
+    nr_free += n;
+}
+
+static struct Page *
+best_fit_alloc_pages(size_t n) {
+    assert(n > 0);
+    if (n > nr_free) {
+        return NULL;
+    }
+    struct Page *best = NULL;
+    for (list_entry_t *le = list_next(&free_list); le != &free_list;
+         le = list_next(le)) {
+        struct Page *p = le2page(le, page_link);
+        if (p->property >= n &&
+            (best == NULL || p->property < best->property)) {
+            best = p;
+            if (p->property == n) {
+                break;
+            }
+        }
+    }
+    if (best == NULL) {
+        return NULL;
+    }
+
+    size_t remaining = best->property - n;
+    list_entry_t *prev = list_prev(&best->page_link);
+    list_del_init(&best->page_link);
+    ClearPageProperty(best);
+    best->property = 0;
+    if (remaining > 0) {
+        struct Page *tail = best + n;
+        tail->property = remaining;
+        SetPageProperty(tail);
+        list_add_after(prev, &tail->page_link);
+    }
+    nr_free -= n;
+    return best;
+}
+
+static void
+best_fit_free_pages(struct Page *base, size_t n) {
+    assert(n > 0);
+    assert(base >= pages && base < pages + (npage - nbase));
+    assert(n <= (size_t)(pages + (npage - nbase) - base));
+    for (struct Page *p = base; p < base + n; p++) {
+        assert(!PageReserved(p) && !PageProperty(p));
+        p->flags = 0;
+        p->property = 0;
+        set_page_ref(p, 0);
+        list_init(&p->page_link);
+    }
+    base->property = n;
+    SetPageProperty(base);
+    best_fit_insert_block(base);
+    nr_free += n;
+}
+
+static size_t
+best_fit_nr_free_pages(void) {
+    return nr_free;
+}
+
+const struct pmm_manager best_fit_pmm_manager = {
+    .name = "best_fit_pmm_manager",
+    .init = best_fit_init,
+    .init_memmap = best_fit_init_memmap,
+    .alloc_pages = best_fit_alloc_pages,
+    .free_pages = best_fit_free_pages,
+    .nr_free_pages = best_fit_nr_free_pages,
+    .check = best_fit_check,
+};
 
 static void
 basic_check(void) {

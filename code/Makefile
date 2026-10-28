@@ -10,7 +10,8 @@ GCCPREFIX := riscv64-unknown-elf-
 #endif
 
 ifndef QEMU
-QEMU := qemu-system-riscv64
+# Inherit Lab2 OpenSBI next-stage metadata; UCOREIMG is defined below.
+QEMU = qemu-system-riscv64 -kernel $(UCOREIMG)
 endif
 
 ifndef SPIKE

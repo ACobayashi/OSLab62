@@ -44,7 +44,7 @@
     csrrw s0, sscratch, x0
     csrr s1, sstatus
     csrr s2, sepc
-    csrr s3, sbadaddr
+    csrr s3, stval  # current CSR name; saved in trapframe.badvaddr
     csrr s4, scause
 
     STORE s0, 2*REGBYTES(sp)
