@@ -22,13 +22,9 @@
 | `kern/trap/trapentry.S` | `RESTORE_ALL`：与已有 `SAVE_ALL` 和 Trap frame 布局对应 |
 | `kern/trap/trapentry.S` | `__alltraps`：传递 Trap frame，调用 C 函数 `trap()` |
 | `kern/trap/trap.c` | `interrupt_handler()`：中断分类、时钟续设、计数、输出和规定条件下关机 |
-| `kern/trap/trap.c` | `exception_handler()`：2410936 已完成，个人异常测试及 GDB 核验通过 |
+| `kern/trap/trap.c` | `exception_handler()`：非法指令、断点、EPC 更新及其他异常的兜底输出 |
 
-保留 `lab3` 注释；`exception_handler()` 标记为实际实现者 `2410936`。功能二原共享标记已拆分，`interrupt_handler()` 的 `YOUR CODE` 和功能一的两个 `YOUR CODE` 留给对应负责人，尚未完成。
-
-注意：当前直接 `make` 能编译链接，但不能据此判断 Lab3 已完成。尚未补齐的 `__alltraps` 没有调用 `trap()`，链接器的 `--gc-sections` 会移除未使用的处理路径。需要合并另两位成员的实现后再验证完整运行和 `make grade`。
-
-2026-10-29 的个人验证使用隔离副本，其中入口/恢复由测试夹具提供，中断桩遇到中断立即报错。四种真实异常、构造 Trap frame 的 EPC/兜底测试以及 GDB 的 EPC/PC/SP 检查均通过；这不是小组最终评分。手动复现步骤见 [异常调试说明](../tests/exception/README.md)，原始日志见 [验证记录](../report/evidence/2410936/README.md)。
+原有三处 `lab3 ... YOUR CODE` 标记均保留。`trap.c` 的实验实现尚未填写，因此当前直接执行 `make` 会报告 `interrupt_handler`、`exception_handler` 未声明；这是待实现状态。仅补声明不能完成这些功能。
 
 ## 编译与验证
 
