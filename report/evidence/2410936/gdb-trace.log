@@ -1,0 +1,34 @@
+The target architecture is set to "riscv:rv64".
+0x0000000000001000 in ?? ()
+Hardware assisted breakpoint 1 at 0xffffffffc0201e0c: file kern/test/probes.S, line 126.
+
+Breakpoint 1, lab3_illegal32 () at kern/test/probes.S:126
+126	    EXCEPTION_PROBE lab3_illegal32, 4, 0x0000007b
+Hardware assisted breakpoint 2 at 0xffffffffc0200a4a: file kern/trap/trap.c, line 88.
+Hardware assisted breakpoint 3 at 0xffffffffc0200b9c: file kern/trap/trapentry.S, line 55.
+Hardware assisted breakpoint 4 at 0xffffffffc0201e9e: file kern/test/probes.S, line 126.
+Hardware assisted breakpoint 5 at 0xffffffffc0202044: file kern/test/probes.S, line 127.
+Hardware assisted breakpoint 6 at 0xffffffffc02021ec: file kern/test/probes.S, line 128.
+Hardware assisted breakpoint 7 at 0xffffffffc0202396: file kern/test/probes.S, line 129.
+Hardware assisted breakpoint 8 at 0xffffffffc0202984: file libs/sbi.c, line 17.
+[TRACE enter] cause=2 EPC=0xffffffffc0201e9a length=4 sepc=0xffffffffc0201e9a stval=0x7b
+0xffffffffc0201e9a <lab3_illegal32_site>:	0x007b
+[TRACE return] EPC=0xffffffffc0201e9e delta=4 saved_sp=0xffffffffc0205f20
+[TRACE resume] PC=0xffffffffc0201e9e SP=0xffffffffc0205f20 t0=0x105 a0=0x10a s0=0x108
+[TRACE enter] cause=2 EPC=0xffffffffc0202042 length=2 sepc=0xffffffffc0202042 stval=0x0
+0xffffffffc0202042 <lab3_illegal16_site>:	0x0000
+[TRACE return] EPC=0xffffffffc0202044 delta=2 saved_sp=0xffffffffc0205f20
+[TRACE resume] PC=0xffffffffc0202044 SP=0xffffffffc0205f20 t0=0x105 a0=0x10a s0=0x108
+[TRACE enter] cause=3 EPC=0xffffffffc02021ea length=2 sepc=0xffffffffc02021ea stval=0x0
+0xffffffffc02021ea <lab3_breakpoint16_site>:	0x9002
+[TRACE return] EPC=0xffffffffc02021ec delta=2 saved_sp=0xffffffffc0205f20
+[TRACE resume] PC=0xffffffffc02021ec SP=0xffffffffc0205f20 t0=0x105 a0=0x10a s0=0x108
+[TRACE enter] cause=3 EPC=0xffffffffc0202392 length=4 sepc=0xffffffffc0202392 stval=0x0
+0xffffffffc0202392 <lab3_breakpoint32_site>:	0x0073
+[TRACE return] EPC=0xffffffffc0202396 delta=4 saved_sp=0xffffffffc0205f20
+[TRACE resume] PC=0xffffffffc0202396 SP=0xffffffffc0205f20 t0=0x105 a0=0x10a s0=0x108
+[TRACE synthetic fallback] cause=5 EPC=0x0
+[TRACE synthetic fallback] cause=20 EPC=0x0
+[TRACE summary] entries=4 returns=4 resumes=4
+[TRACE] All EPC/PC/SP checks: PASS
+[Inferior 1 (process 1) detached]

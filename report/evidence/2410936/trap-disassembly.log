@@ -1,0 +1,11 @@
+
+bin/kernel:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+ffffffffc0200abe <trap>:
+ffffffffc0200abe:	11853783          	ld	a5,280(a0)
+ffffffffc0200ac2:	0007c363          	bltz	a5,ffffffffc0200ac8 <trap+0xa>
+ffffffffc0200ac6:	b751                	j	ffffffffc0200a4a <exception_handler>
+ffffffffc0200ac8:	04c0106f          	j	ffffffffc0201b14 <interrupt_handler>
