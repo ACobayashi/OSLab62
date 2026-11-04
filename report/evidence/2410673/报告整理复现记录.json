@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "source_sha256": "639770e6099b28225103e63e528adc41ce735889584a6b174098eb2d8db88405",
+  "preparation_script": "prepare_hyc.py",
+  "reference_entry_used": false,
+  "context_qemu_exit_status": 0,
+  "context_real_traps_passed": 258,
+  "exception_qemu_exit_status": 0,
+  "exception_real_cases_passed": 4,
+  "full_make_grade_run": false,
+  "runtime_images_captured": false
+}
