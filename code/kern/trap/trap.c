@@ -6,10 +6,12 @@
 #include <memlayout.h>
 #include <mmu.h>
 #include <riscv.h>
+#include <sbi.h>
 #include <stdio.h>
 #include <trap.h>
 
 #define TICK_NUM 100
+#define SHUTDOWN_AFTER 10
 
 static void print_ticks() {
     cprintf("%d ticks\n", TICK_NUM);
@@ -80,8 +82,67 @@ void print_regs(struct pushregs *gpr) {
     cprintf("  t6       0x%08x\n", gpr->t6);
 }
 
-//lab3 function2 YOUR CODE (interrupt_handler: assigned to 2410933)
-void interrupt_handler(struct trapframe *tf);
+//lab3 function2 2410933 (interrupt_handler)
+void interrupt_handler(struct trapframe *tf) {
+    uintptr_t cause = tf->cause &
+                      ~((uintptr_t)1 << (sizeof(uintptr_t) * 8 - 1));
+
+    switch (cause) {
+        case IRQ_U_SOFT:
+            cprintf("User software interrupt\n");
+            break;
+        case IRQ_S_SOFT:
+            cprintf("Supervisor software interrupt\n");
+            break;
+        case IRQ_H_SOFT:
+            cprintf("Hypervisor software interrupt\n");
+            break;
+        case IRQ_M_SOFT:
+            cprintf("Machine software interrupt\n");
+            break;
+        case IRQ_U_TIMER:
+            cprintf("User timer interrupt\n");
+            break;
+        case IRQ_S_TIMER:
+            clock_set_next_event();
+            ticks++;
+            if (ticks % TICK_NUM == 0) {
+                print_ticks();
+                if (ticks / TICK_NUM >= SHUTDOWN_AFTER) {
+                    sbi_shutdown();
+                }
+            }
+            break;
+        case IRQ_H_TIMER:
+            cprintf("Hypervisor timer interrupt\n");
+            break;
+        case IRQ_M_TIMER:
+            cprintf("Machine timer interrupt\n");
+            break;
+        case IRQ_U_EXT:
+            cprintf("User external interrupt\n");
+            break;
+        case IRQ_S_EXT:
+            cprintf("Supervisor external interrupt\n");
+            break;
+        case IRQ_H_EXT:
+            cprintf("Hypervisor external interrupt\n");
+            break;
+        case IRQ_M_EXT:
+            cprintf("Machine external interrupt\n");
+            break;
+        case IRQ_COP:
+            cprintf("Coprocessor interrupt\n");
+            break;
+        case IRQ_HOST:
+            cprintf("Host interrupt\n");
+            break;
+        default:
+            cprintf("Unknown interrupt: cause %d\n", cause);
+            print_trapframe(tf);
+            break;
+    }
+}
 
 //lab3 function2 2410936 (exception_handler)
 void exception_handler(struct trapframe *tf) {
