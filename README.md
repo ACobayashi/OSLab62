@@ -8,7 +8,7 @@
 |------|------|------|------|
 | Lab1：最小可执行内核 | [lab1](https://github.com/ACobayashi/OSLab62/tree/lab1) | RISC-V64 内核启动、SBI 输出与 GDB 调试 | 已完成 |
 | Lab2：物理内存和页表 | [lab2](https://github.com/ACobayashi/OSLab62/tree/lab2) | 物理页分配、Best Fit、Buddy、SLUB 与 Sv39 分页 | 已完成 |
-| Lab3 | [lab3](https://github.com/ACobayashi/OSLab62/tree/lab3) | 操作系统后续实验内容 | 尚未开始 |
+| Lab3：中断与异常处理 | [lab3](https://github.com/ACobayashi/OSLab62/tree/lab3) | Trap 上下文保存与恢复、时钟中断、非法指令与断点处理 | 已完成 |
 
 ## 实验分支目录
 
