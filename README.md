@@ -24,8 +24,6 @@
 |   |-- images/           # 实验运行和调试截图
 |   |-- prompt.md         # AI 提示词记录
 |   `-- report.md         # 实验报告
-|-- tests/
-|   `-- exception/        # 独立异常测试、准备脚本与调试辅助代码
 `-- README.md
 ```
 
