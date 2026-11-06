@@ -1,0 +1,32 @@
+0x0000000000001000 in ?? ()
+Hardware assisted breakpoint 1 at 0xffffffffc0201e0c: file kern/test/probes.S, line 126.
+
+Breakpoint 1, lab3_illegal32 () at kern/test/probes.S:126
+126	    EXCEPTION_PROBE lab3_illegal32, 4, 0x0000007b
+Hardware assisted breakpoint 2 at 0xffffffffc0200a4a: file kern/trap/trap.c, line 88.
+
+Breakpoint 2, exception_handler (tf=0xffffffffc0205e00) at kern/trap/trap.c:88
+88	    switch (tf->cause) {
+$1 = 0x2
+$2 = 0xffffffffc0201e9a
+0xffffffffc0201e9a <lab3_illegal32_site>:	0x007b	0x0000
+$3 = 0xffffffffc0201e9a
+$4 = 0x7b
+Hardware assisted breakpoint 3 at 0xffffffffc0200b9c: file kern/trap/trapentry.S, line 55.
+
+Temporary breakpoint 3, __trapret () at kern/trap/trapentry.S:55
+55	    RESTORE_ALL
+$5 = 0xffffffffc0201e9e
+$6 = 4
+$7 = 0xffffffffc0201e9a
+Hardware assisted breakpoint 4 at 0xffffffffc0201e9e: file kern/test/probes.S, line 126.
+
+Temporary breakpoint 4, 0xffffffffc0201e9e in lab3_illegal32_resume () at kern/test/probes.S:126
+126	    EXCEPTION_PROBE lab3_illegal32, 4, 0x0000007b
+$8 = 0xffffffffc0201e9e
+$9 = 0xffffffffc0205f20
+$10 = 0xffffffffc0205f20
+t0             0x105	261
+a0             0x10a	266
+s0             0x108               0x108
+[Inferior 1 (process 1) detached]
