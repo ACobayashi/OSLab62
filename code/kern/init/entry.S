@@ -11,7 +11,7 @@ kern_entry:
     sd a0, 0(t0)
     la t0, boot_dtb
     sd a1, 0(t0)
-
+    
     # t0 := 三级页表的虚拟地址
     lui     t0, %hi(boot_page_table_sv39)
     # t1 := 0xffffffff40000000 即虚实映射偏移量
@@ -29,28 +29,21 @@ kern_entry:
     csrw    satp, t0
     # 使用 sfence.vma 指令刷新 TLB
     sfence.vma
-    # lab2 startup fix 2410673: the current PC is still a physical address.
-    # Use the temporary identity mapping until execution reaches high memory.
+    # lab2 startup fix 2410673: enable paging under a temporary identity map.
     lui t0, %hi(.Lhigh_entry)
     addi t0, t0, %lo(.Lhigh_entry)
     jr t0
 .Lhigh_entry:
-    # Remove the temporary root entry; retain the original high mapping only.
     lui t0, %hi(boot_page_table_sv39)
     sd zero, 8 * 2(t0)
     sfence.vma
     
     # 我们在虚拟内存空间中：随意将 sp 设置为虚拟地址！
     lui sp, %hi(bootstacktop)
+    addi sp, sp, %lo(bootstacktop)
 
     # 我们在虚拟内存空间中：随意跳转到虚拟地址！
-    # 1. 使用临时寄存器 t1 计算栈顶的精确地址
-    lui t1, %hi(bootstacktop)
-    addi t1, t1, %lo(bootstacktop)
-    # 2. 将精确地址一次性地、安全地传给 sp
-    mv sp, t1
-    # 现在栈指针已经完美设置，可以安全地调用任何C函数了
-    # 然后跳转到 kern_init (不再返回)
+    # 跳转到 kern_init
     lui t0, %hi(kern_init)
     addi t0, t0, %lo(kern_init)
     jr t0
@@ -64,14 +57,15 @@ bootstack:
     .global bootstacktop
 bootstacktop:
 
-    # a page table for Sv39
+.section .data
+    # 由于我们要把这个页表放到一个页里面，因此必须 12 位对齐
     .align PGSHIFT
     .global boot_page_table_sv39
 # 分配 4KiB 内存给预设的三级页表
 boot_page_table_sv39:
     # 0xffffffff_c0000000 map to 0x80000000 (1G)
-    # lab2 startup fix 2410673: entry 2 temporarily identity-maps DRAM.
-    # .Lhigh_entry clears it after switching the PC to the high mapping.
+    # 前 511 个页表项均设置为 0 ，因此 V=0 ，意味着是空的(unmapped)
+    # lab2 startup fix 2410673: temporarily identity-map physical DRAM.
     .zero 8 * 2
     .quad (0x80000 << 10) | 0xcf
     .zero 8 * (511 - 3)
