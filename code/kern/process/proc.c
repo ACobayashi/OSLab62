@@ -218,6 +218,96 @@ init_main(void *arg)
     return 0;
 }
 
+static struct proc_struct *alloc_proc(void);
+
+//LAB4 function2 2410673
+static int
+copy_mm(uint32_t clone_flags, struct proc_struct *proc)
+{
+    // Lab4 内核线程共用内核地址空间，沿用 alloc_proc 设置的页表。
+    proc->mm = NULL;
+    return 0;
+}
+
+//LAB4 function2 2410673
+static void
+copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf)
+{
+    // 把首次运行的现场复制到子线程自己的内核栈顶。
+    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
+    *proc->tf = *tf;
+    proc->tf->gpr.a0 = 0;
+    proc->tf->gpr.sp = (esp != 0) ? esp : (uintptr_t)proc->tf;
+
+    // 首次切换后从 forkret 开始，由 Trap 返回路径恢复现场。
+    proc->context.ra = (uintptr_t)forkret;
+    proc->context.sp = (uintptr_t)proc->tf;
+}
+
+//LAB4 function2 2410673
+int
+do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
+{
+    bool intr_flag;
+    local_intr_save(intr_flag);
+
+    // 当前分配接口不会睡眠，关中断直到子线程登记完毕。
+    int ret = -E_NO_FREE_PROC;
+    if (nr_process >= MAX_PROCESS)
+    {
+        goto out;
+    }
+
+    ret = -E_NO_MEM;
+    struct proc_struct *proc = alloc_proc();
+    if (proc == NULL)
+    {
+        goto out;
+    }
+    proc->parent = current;
+
+    ret = setup_kstack(proc);
+    if (ret != 0)
+    {
+        goto free_proc;
+    }
+    ret = copy_mm(clone_flags, proc);
+    if (ret != 0)
+    {
+        goto free_stack;
+    }
+    copy_thread(proc, stack, tf);
+
+    proc->pid = get_pid();
+    hash_proc(proc);
+    list_add(&proc_list, &proc->list_link);
+    nr_process++;
+    wakeup_proc(proc);
+    ret = proc->pid;
+    goto out;
+
+free_stack:
+    put_kstack(proc);
+free_proc:
+    kfree(proc);
+out:
+    local_intr_restore(intr_flag);
+    return ret;
+}
+
+//LAB4 function2 2410673
+int
+kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
+{
+    struct trapframe tf = {0};
+    // kernel_thread_entry 从 s0 取函数地址，从 s1 取参数。
+    tf.gpr.s0 = (uintptr_t)fn;
+    tf.gpr.s1 = (uintptr_t)arg;
+    tf.epc = (uintptr_t)kernel_thread_entry;
+    tf.status = (read_csr(sstatus) | SSTATUS_SPP | SSTATUS_SPIE) & ~SSTATUS_SIE;
+    return do_fork(clone_flags | CLONE_VM, 0, &tf);
+}
+
 //LAB4 function2 YOUR CODE
 
 
