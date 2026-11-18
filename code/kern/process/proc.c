@@ -308,7 +308,60 @@ kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
     return do_fork(clone_flags | CLONE_VM, 0, &tf);
 }
 
-//LAB4 function2 YOUR CODE
+//LAB4 function2 2410936 (alloc_proc)
+static struct proc_struct *
+alloc_proc(void)
+{
+    struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
+    if (proc != NULL)
+    {
+        memset(proc, 0, sizeof(*proc));
+        proc->state = PROC_UNINIT;
+        proc->pid = -1;
+        proc->pgdir = boot_pgdir_pa;
+        list_init(&proc->list_link);
+        list_init(&proc->hash_link);
+    }
+    return proc;
+}
+
+//LAB4 function2 2410936 (proc_init)
+void
+proc_init(void)
+{
+    // set_proc_name copies a fixed PROC_NAME_LEN bytes from its source.
+    static const char idle_name[PROC_NAME_LEN + 1] = "idle";
+    static const char init_name[PROC_NAME_LEN + 1] = "init";
+
+    list_init(&proc_list);
+    for (int i = 0; i < HASH_LIST_SIZE; i++)
+    {
+        list_init(hash_list + i);
+    }
+
+    idleproc = alloc_proc();
+    if (idleproc == NULL)
+    {
+        panic("proc_init: cannot allocate idleproc.\n");
+    }
+    idleproc->pid = 0;
+    idleproc->state = PROC_RUNNABLE;
+    idleproc->kstack = (uintptr_t)bootstack;
+    idleproc->need_resched = 1;
+    set_proc_name(idleproc, idle_name);
+    current = idleproc;
+    // Idle is counted, but stays outside the ordinary process list and hash.
+    nr_process++;
+
+    int pid = kernel_thread(init_main, "Hello world!!", 0);
+    if (pid <= 0)
+    {
+        panic("proc_init: cannot create initproc (%d).\n", pid);
+    }
+    initproc = find_proc(pid);
+    assert(initproc != NULL);
+    set_proc_name(initproc, init_name);
+}
 
 
 //LAB4 function3 YOUR CODE
