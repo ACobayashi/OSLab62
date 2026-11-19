@@ -1,0 +1,7 @@
+warning: Architecture rejected target-supplied description
+warning: No executable has been specified and target does not support
+determining executable automatically.  Try using the "file" command.
+warning: Architecture rejected target-supplied description
+Truncated register 37 in remote 'g' packet
+Breakpoint 1 at 0xc02000c0
+The program is not being run.

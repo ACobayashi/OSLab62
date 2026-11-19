@@ -1,0 +1,5 @@
+qemu-system-riscv64: terminating on signal 15 from pid 9100 (sh)
+  -check PMM:                                no $qemu_out
+  -check Process Create:                     no $qemu_out
+  -check Schedule:                           no $qemu_out
+Total Score: 0/30

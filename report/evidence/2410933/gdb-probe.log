@@ -1,0 +1,7 @@
+The target architecture is set to "riscv:rv64".
+0x0000000000001000 in ?? ()
+pc             0x1000	0x1000
+sp             0x0	0x0
+Breakpoint 1 at 0xffffffffc02000c0: file kern/libs/readline.c, line 26.
+Remote connection closed
+The program is not being run.

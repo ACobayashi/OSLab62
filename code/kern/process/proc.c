@@ -364,4 +364,40 @@ proc_init(void)
 }
 
 
-//LAB4 function3 YOUR CODE
+// LAB4 function3 2410933
+void
+proc_run(struct proc_struct *proc)
+{
+    if (proc == current)
+    {
+        return;
+    }
+
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    struct proc_struct *prev = current;
+    current = proc;
+
+    // pgdir 保存物理地址；Sv39 的 MODE 位于 satp 的高四位。
+    uintptr_t satp = ((uintptr_t)SATP_MODE_SV39 << 60) |
+                     (proc->pgdir >> RISCV_PGSHIFT);
+    write_csr(satp, satp);
+    flush_tlb();
+    switch_to(&prev->context, &proc->context);
+
+    // 旧线程再次被调度回来后，恢复它进入切换前的中断状态。
+    local_intr_restore(intr_flag);
+}
+
+// LAB4 function3 2410933
+void
+cpu_idle(void)
+{
+    while (1)
+    {
+        if (current->need_resched)
+        {
+            schedule();
+        }
+    }
+}
